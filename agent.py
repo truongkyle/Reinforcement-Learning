@@ -2,9 +2,10 @@ import torch
 import random
 import numpy as np
 from collections import deque
-from game import SnakeGameAI, Direction, Point
+from game import SPEED, SnakeGameAI, Direction, Point, Snake
 from model import Linear_QNet, QTrainer
 from helper import plot
+import threading
 
 MAX_MEMORY = 100_000
 BATCH_SIZE = 1000
@@ -108,31 +109,28 @@ class Agent:
 
         return final_move
 
-
-def train():
-    plot_scores = []
-    plot_mean_scores = []
-    total_score = 0
+def trainEachSnake(agent, idagent):
+    # plot_scores = []
+    # plot_mean_scores = []
+    # total_score = 0
     record = 0
     old_record = 0
-    agent = Agent()
-    game = SnakeGameAI()
-    while True:
+    while game.Snake[idagent].train:
         # get old state
-        state_old = agent.get_state(game)
+        state_old = agent.get_state(game.Snake[idagent])
 
         # get move
         final_move = agent.get_action(state_old)
 
         # perform move and get new state
-        reward, done, score = game.play_step(final_move)
-        if(game.frame_iteration !=0 and done != True):
-            agent.addStatus(game.snake, score, game.food, game.frame_iteration,game.direction, old_record)
-        if(reward == -20):
-            fileModel = str(agent.n_games) + ".pth"
-            agent.model.save(fileModel)
-            game.QuitGame()
-        state_new = agent.get_state(game)
+        reward, done, score = game.Snake[idagent].play_step(final_move)
+        if(reward == 10):
+            game._place_food()
+        game._update_ui() 
+        game.clock.tick(SPEED)
+        if(game.Snake[idagent].frame_iteration !=0 and done != True):
+            agent.addStatus(game.Snake[idagent].snake, score, game.food, game.Snake[idagent].frame_iteration,game.Snake[idagent].direction, old_record)
+        state_new = agent.get_state(game.Snake[idagent])
 
         # train short memory
         agent.train_short_memory(state_old, final_move, reward, state_new, done)
@@ -148,27 +146,53 @@ def train():
             if(len(agent.statusGame) > 0 and len(agent.statusGame) > agent.n_revise):
                 for i in range(agent.n_revise):
                     agent.statusGame.pop()
-                game.replay(agent.statusGame[-1])
+                game.Snake[idagent].replay(agent.statusGame[-1])
                 old_record = agent.statusGame[-1][-1]
             else:
                 agent.n_revise = 0
-                game.reset()
+                game.Snake[idagent].reset()
             agent.n_games += 1
             agent.train_long_memory()
             if score > old_record:
                 old_record = score
             if score > record:
                 record = score
-                fileModel = str(record) + ".pth"
+                fileModel = str(idagent) +"_" + str(agent.n_games)+ ".pth"
                 agent.model.save(fileModel)
 
-            print('Game', agent.n_games, 'Score', score, 'Record:', record)
+            print('Agent',idagent,'Game', agent.n_games, 'Score', score, 'Record:', record)
 
-            plot_scores.append(score)
-            total_score += score
-            mean_score = total_score / agent.n_games
-            plot_mean_scores.append(mean_score)
-            plot(plot_scores, plot_mean_scores)
+            # plot_scores.append(score)
+            # total_score += score
+            # mean_score = total_score / agent.n_games
+            # plot_mean_scores.append(mean_score)
+            # plot(plot_scores, plot_mean_scores)
+
+
+
+def train():
+    # plot_scores = []
+    # plot_mean_scores = []
+    # total_score = 0
+    record = 0
+    old_record = 0
+    num_snake = 3
+    agents = []
+    snakes = []
+    global game
+
+    Threads_training_snake = []
+    for i in range(num_snake):
+        snake = Snake()
+        snakes.append(snake)
+    game = SnakeGameAI(num_snake=num_snake, Snake= snakes)
+    for i in range(num_snake):
+        agent =Agent()
+        agents.append(agent)
+        thread = threading.Thread(target=trainEachSnake, args=(agent,i,))
+        thread.start()
+
+        Threads_training_snake.append(thread)
 
 if __name__ == '__main__':
     train()

@@ -1,3 +1,4 @@
+from matplotlib.pyplot import cla
 import pygame
 import random
 from enum import Enum
@@ -26,15 +27,13 @@ BLACK = (0,0,0)
 BLOCK_SIZE = 20
 SPEED = 40
 
-class SnakeGameAI:
-
-    def __init__(self, w=640, h=480):
+class Snake:
+    
+    def __init__(self, w=640, h=480, food = Point(0,0)):
         self.w = w
         self.h = h
-        # init display
-        self.display = pygame.display.set_mode((self.w, self.h))
-        pygame.display.set_caption('Snake')
-        self.clock = pygame.time.Clock()
+        self.food = food
+        self.train = True
         self.reset()
 
 
@@ -46,30 +45,21 @@ class SnakeGameAI:
         self.snake = [self.head]
 
         self.score = 0
-        self.food = None
-        self._place_food()
         self.frame_iteration = 0
     
     def replay(self, statusGame):
-        self.direction = Direction.RIGHT
-        count = len(statusGame[0]) -1
         self.snake = []
         for item in statusGame[0]:
             itemPoint = Point(item[0],item[1])
             self.snake.append(itemPoint)  
         self.head = self.snake[0]
         self.score = statusGame[1]
-        self.food =Point(statusGame[2][0],statusGame[2][1]) 
+        # self.food =Point(statusGame[2][0],statusGame[2][1]) 
         self.frame_iteration = statusGame[3]
         self.direction = statusGame[4]
 
 
-    def _place_food(self):
-        x = random.randint(0, (self.w-BLOCK_SIZE )//BLOCK_SIZE )*BLOCK_SIZE
-        y = random.randint(0, (self.h-BLOCK_SIZE )//BLOCK_SIZE )*BLOCK_SIZE
-        self.food = Point(x, y)
-        if self.food in self.snake:
-            self._place_food()
+    
     def QuitGame(self):
         pygame.quit()
         quit()
@@ -80,6 +70,7 @@ class SnakeGameAI:
         # 1. collect user input
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
+                self.train = False
                 pygame.quit()
                 quit()
         
@@ -99,13 +90,11 @@ class SnakeGameAI:
         if self.head == self.food:
             self.score += 1
             reward = 10
-            self._place_food()
         else:
             self.snake.pop()
         
         # 5. update ui and clock
-        self._update_ui()
-        self.clock.tick(SPEED)
+
         # 6. return game over and score
         return reward, game_over, self.score
 
@@ -121,20 +110,6 @@ class SnakeGameAI:
             return True
 
         return False
-
-
-    def _update_ui(self):
-        self.display.fill(BLACK)
-
-        for pt in self.snake:
-            pygame.draw.rect(self.display, BLUE1, pygame.Rect(pt.x, pt.y, BLOCK_SIZE, BLOCK_SIZE))
-            pygame.draw.rect(self.display, BLUE2, pygame.Rect(pt.x+4, pt.y+4, 12, 12))
-
-        pygame.draw.rect(self.display, RED, pygame.Rect(self.food.x, self.food.y, BLOCK_SIZE, BLOCK_SIZE))
-
-        text = font.render("Score: " + str(self.score), True, WHITE)
-        self.display.blit(text, [0, 0])
-        pygame.display.flip()
 
 
     def _move(self, action):
@@ -166,3 +141,49 @@ class SnakeGameAI:
             y -= BLOCK_SIZE
 
         self.head = Point(x, y)
+    
+        
+
+
+class SnakeGameAI:
+
+    def __init__(self, w=640, h=480, num_snake = 3, Snake = []):
+        self.w = w
+        self.h = h
+        self.num_snake = num_snake
+        self.Snake = Snake
+        # init display
+        self.display = pygame.display.set_mode((self.w, self.h))
+        pygame.display.set_caption('Snake')
+        self.clock = pygame.time.Clock()
+        self.food = None
+        self._place_food()
+
+    def _update_ui(self):
+        self.display.fill(BLACK)
+        for snake in self.Snake:
+            for pt in snake.snake:
+                pygame.draw.rect(self.display, BLUE1, pygame.Rect(pt.x, pt.y, BLOCK_SIZE, BLOCK_SIZE))
+                pygame.draw.rect(self.display, BLUE2, pygame.Rect(pt.x+4, pt.y+4, 12, 12))
+
+            pygame.draw.rect(self.display, RED, pygame.Rect(self.food.x, self.food.y, BLOCK_SIZE, BLOCK_SIZE))
+
+        # text = font.render("Score: " + str(self.score), True, WHITE)
+        # self.display.blit(text, [0, 0])
+        pygame.display.flip()
+    
+    def _place_food(self):
+        x = random.randint(0, (self.w-BLOCK_SIZE )//BLOCK_SIZE )*BLOCK_SIZE
+        y = random.randint(0, (self.h-BLOCK_SIZE )//BLOCK_SIZE )*BLOCK_SIZE
+        self.food = Point(x, y)
+        checkfood = True
+        
+
+        for itemsnake in self.Snake:
+            if self.food in itemsnake.snake:
+                checkfood = False
+        if(checkfood):
+            self._place_food()
+        
+        for snake in self.Snake:
+            snake.food = self.food
